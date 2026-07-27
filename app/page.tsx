@@ -77,7 +77,7 @@ const defaultStandard = `2.1-A｜基础技术错误｜必须改｜夹帧、黑�
 2.1-B｜基础技术错误｜必须改｜尺寸、格式、清晰度、分辨率或码率不符合交付要求必须修改。
 2.1-C｜基础技术错误｜必须改｜嘴型与配音明显错位，音效错误、爆音或异常静音必须修改。
 2.2-A｜角色造型一致性｜必须改｜主角发色、服装、脸型、体型发生明显变化必须修改。
-2.2-B｜角色造型一致性｜建议改｜主角配饰、鞋子或五官状态出现轻微变化建议修改。
+2.2-B｜角色造型一致性｜建议改｜主角配饰、鞋子、五官或眼睛状态出现轻微变化建议修改。
 2.2-C｜角色造型一致性｜可接受｜配角不影响识别的轻微造型差异可接受。
 2.3-A｜穿帮与连续性｜必须改｜主角、关键道具或前后景关系出现明显穿帮必须修改。
 2.3-B｜穿帮与连续性｜建议改｜配角、普通道具、门或物体来源的微小穿帮建议修改。
@@ -117,7 +117,7 @@ const severityFromText = (value: string): Severity =>
 const standardDimensionRules = [
   ["2.1", /黑帧|白帧|夹帧|格式|尺寸|清晰|分辨率|码率|爆音|静音|音效|嘴型|口型|基础技术/],
   ["2.2", /角色|人物|服装|衣服|脸型|发色|鞋|配饰|造型|体型|眼睛|五官/],
-  ["2.3", /穿帮|连续|道具|前景|后景|空间|来源|门|位置变化|衔接/],
+  ["2.3", /穿帮|连续|道具|前景|后景|空间|来源|门|位置变化|衔接|pose|动作与/],
   ["2.4", /光影|光源|阴影|色温|明暗/],
   ["2.5", /变形|拉伸|扭曲|画幅|肢体|畸变|背景.*(?:动|飘|抖)/],
   ["2.6", /遮挡|出画|卡边|裁切|构图|人物大小|主体大小|文字.*挡/],
@@ -355,7 +355,7 @@ const compareOpinion = (opinion: Opinion, entries: StandardEntry[]): Opinion => 
       best = entry;
     }
   }
-  const creativeCue = /应该|可以考虑|希望|更有感觉|更好看|更突出|主线|剧情|叙事|出场|氛围|尴尬|感染力|呈现方式|先.+再|不应该是.+表情|不要再出现/.test(opinion.text);
+  const creativeCue = /应该|可以考虑|希望|更有感觉|更好看|更突出|主线|剧情|叙事|出场|氛围|尴尬|感染力|呈现方式|先.+再|再移动镜头|再小一点|不应该是.+表情|不要再出现/.test(opinion.text);
   const summary = opinion.text.replace(/\b\d{1,2}:\d{2}(?::\d{2})?(?:\.\d{1,3})?\b/g, "").slice(0, 48);
   if (!best || bestScore < 2 || (creativeCue && !primaryDimension)) {
     return {
@@ -374,25 +374,30 @@ const compareOpinion = (opinion: Opinion, entries: StandardEntry[]): Opinion => 
   const dimensionLabel = detectedDimensions.length
     ? detectedDimensions.map((id) => `${id} ${dimensionNames[id]}`).join(" + ")
     : `${best.dimension} ${best.title}`;
-  if ((strongRequest && best.severity !== "red") || ambiguousCue || bestScore < 4) {
+  const partialMatch = (strongRequest && best.severity !== "red") || bestScore < 4 || creativeCue || (ambiguousCue && bestScore < 6);
+  if (partialMatch) {
+    const severeCue = /严重|完全|没法看|大量|明显|必须|无法理解/.test(opinion.text);
+    const partialSeverity: Severity = best.severity === "red" && !severeCue ? "yellow" : best.severity;
     return {
       ...opinion,
       summary,
       status: "exceeds",
       dimension: dimensionLabel,
       clauseId: best.id,
-      severity: best.severity,
+      severity: partialSeverity,
       basis: `${best.id}｜${best.title}｜${severityText[best.severity]}｜${best.text}`,
       reason: strongRequest && best.severity !== "red" ? "标准中有相关条目，但该意见的强制程度高于对应条款。" : "涉及的问题在审核标准中有提及，但具体场景或证据未被明确覆盖，建议人工复核。",
     };
   }
+  const softSeverityCue = /不要飘|注意|把控|略微|一点|轻微/.test(opinion.text);
+  const resolvedSeverity: Severity = best.severity === "red" && softSeverityCue ? "yellow" : best.severity;
   return {
     ...opinion,
     summary,
     status: "within",
     dimension: dimensionLabel,
     clauseId: best.id,
-    severity: best.severity,
+    severity: resolvedSeverity,
     basis: `${best.id}｜${best.title}｜${severityText[best.severity]}｜${best.text}`,
     reason: "反馈内容能直接对应到审核标准中的具体条款，有明确标准依据。",
   };
