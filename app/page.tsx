@@ -18,6 +18,7 @@ type Issue = {
 
 type Opinion = {
   id: string;
+  sequence: string;
   timecode: string;
   text: string;
   summary: string;
@@ -66,46 +67,148 @@ const severityText: Record<Severity, string> = {
 };
 
 const opinionStatusText: Record<OpinionStatus, string> = {
-  within: "有标准依据",
-  exceeds: "部分相关",
-  unsupported: "超出标准",
+  within: "✅ 有标准依据",
+  exceeds: "⚠️ 部分相关",
+  unsupported: "❓ 超出标准",
   pending: "待判断",
 };
 
-const defaultStandard = `2.1-A｜基础技术错误｜必须改｜黑帧、白帧、夹帧、卡顿、画面比例错误、音频爆音或异常静音必须修改。
+const defaultStandard = `2.1-A｜基础技术错误｜必须改｜夹帧、黑帧、白帧或异常画面必须修改。
+2.1-B｜基础技术错误｜必须改｜尺寸、格式、清晰度、分辨率或码率不符合交付要求必须修改。
+2.1-C｜基础技术错误｜必须改｜嘴型与配音明显错位，音效错误、爆音或异常静音必须修改。
 2.2-A｜角色造型一致性｜必须改｜主角发色、服装、脸型、体型发生明显变化必须修改。
-2.2-B｜角色造型一致性｜可接受｜配角不影响识别的轻微造型差异可接受。
-2.3-A｜穿帮与连续性｜必须改｜主角、关键道具、前后景关系出现明显穿帮或连续性错误必须修改。
-2.3-B｜穿帮与连续性｜建议改｜配角或非关键道具的微小穿帮建议修改。
-2.4-A｜光影一致性｜必须改｜同一场景的光源方向反转、阴影或色温明显跳变必须修改。
+2.2-B｜角色造型一致性｜建议改｜主角配饰、鞋子或五官状态出现轻微变化建议修改。
+2.2-C｜角色造型一致性｜可接受｜配角不影响识别的轻微造型差异可接受。
+2.3-A｜穿帮与连续性｜必须改｜主角、关键道具或前后景关系出现明显穿帮必须修改。
+2.3-B｜穿帮与连续性｜建议改｜配角、普通道具、门或物体来源的微小穿帮建议修改。
+2.3-C｜穿帮与连续性｜必须改｜空间关系、动作衔接或场景连续性错误影响理解必须修改。
+2.4-A｜光影一致性｜必须改｜同一场景光源方向反转、阴影或色温明显跳变必须修改。
 2.4-B｜光影一致性｜可接受｜不影响观看的正常场景光影差异可接受。
-2.5-A｜画面变形｜必须改｜主角脸部、肢体明显拉伸、扭曲或画幅变形必须修改。
-2.5-B｜画面变形｜可接受｜背景轻微变形且不影响主体可接受。
-2.6-A｜安全构图｜必须改｜主角脸部、头部被裁切，主体严重遮挡、出画或卡边必须修改。
-2.6-B｜安全构图｜可接受｜符合叙事目的的半身特写与设计性裁切可接受。
-2.7-A｜音画与视频节奏｜必须改｜音画错位、台词与口型不同步、关键动作卡顿必须修改。
-2.7-B｜音画与视频节奏｜建议改｜单页停留与节奏轻微偏差建议调整。
-2.8-A｜补帧流畅度｜必须改｜明显闪烁、跳帧、低帧率、主体漂移必须修改。
-2.8-B｜补帧流畅度｜可接受｜设计性静态画面可接受。
+2.5-A｜画面拉伸变形｜必须改｜主角脸部或肢体明显拉伸、扭曲、动作畸变必须修改。
+2.5-B｜画面拉伸变形｜必须改｜背景元素持续扭动、拉伸或画幅比例不一致必须修改。
+2.5-C｜画面拉伸变形｜可接受｜背景轻微变形且不影响主体可接受。
+2.6-A｜安全构图与卡边｜必须改｜主角脸部、头部被裁切，主体严重遮挡、出画或卡边必须修改。
+2.6-B｜安全构图与卡边｜必须改｜文字遮挡人物或关键画面信息必须修改。
+2.6-C｜安全构图与卡边｜可接受｜符合叙事目的的半身特写与设计性裁切可接受。
+2.7-A｜视频节奏｜必须改｜音画完全错位、台词未结束即切换、气泡与配音不匹配必须修改。
+2.7-B｜视频节奏｜建议改｜单页停留时间、交互与镜头时序存在轻微偏差建议调整。
+2.7-C｜视频节奏｜可接受｜不影响理解的轻微节奏差异可接受。
+2.8-A｜补帧与流畅度｜必须改｜明显卡顿、闪烁、跳帧、低帧率或主体漂移必须修改。
+2.8-B｜补帧与流畅度｜建议改｜轻微不流畅但不影响理解建议修改。
+2.8-C｜补帧与流畅度｜可接受｜设计性静态画面可接受。
 2.9-A｜转场规范｜必须改｜场景变化无转场并造成理解障碍必须修改。
 2.9-B｜转场规范｜建议改｜转场时长或形式轻微不统一建议调整。`;
+
+const dimensionNames: Record<string, string> = {
+  "2.1": "基础技术错误",
+  "2.2": "角色造型一致性",
+  "2.3": "穿帮/连续性",
+  "2.4": "光影一致性",
+  "2.5": "画面拉伸变形",
+  "2.6": "安全构图/卡边",
+  "2.7": "视频节奏",
+  "2.8": "补帧与流畅度",
+  "2.9": "转场规范",
+};
 
 const severityFromText = (value: string): Severity =>
   /必须|必改|严重|红/.test(value) ? "red" : /建议|黄/.test(value) ? "yellow" : "green";
 
-const parseStandardEntries = (lines: string[]): StandardEntry[] =>
-  lines.map((line, index) => {
-    const pipe = line.split(/[｜|]/).map((value) => value.trim()).filter(Boolean);
-    if (pipe.length >= 4 && /^\d+(?:\.\d+)?-[A-Z0-9]+$/i.test(pipe[0])) {
-      return { id: pipe[0], dimension: pipe[0].split("-")[0], title: pipe[1], severity: severityFromText(pipe[2]), text: pipe.slice(3).join("｜") };
+const standardDimensionRules = [
+  ["2.1", /黑帧|白帧|夹帧|格式|尺寸|清晰|分辨率|码率|爆音|静音|音效|嘴型|口型|基础技术/],
+  ["2.2", /角色|人物|服装|衣服|脸型|发色|鞋|配饰|造型|体型|眼睛|五官/],
+  ["2.3", /穿帮|连续|道具|前景|后景|空间|来源|门|位置变化|衔接/],
+  ["2.4", /光影|光源|阴影|色温|明暗/],
+  ["2.5", /变形|拉伸|扭曲|画幅|肢体|畸变|背景.*(?:动|飘|抖)/],
+  ["2.6", /遮挡|出画|卡边|裁切|构图|人物大小|主体大小|文字.*挡/],
+  ["2.7", /音画|同步|节奏|台词|跳转|停留|气泡|配音|交互|镜头.*(?:先|后)/],
+  ["2.8", /卡顿|闪烁|跳帧|帧率|漂移|飘|不流畅|补帧|没法看/],
+  ["2.9", /转场|场景切换|硬切/],
+] as const;
+
+const detectDimensionIds = (text: string) =>
+  standardDimensionRules.filter(([, pattern]) => pattern.test(text)).map(([id]) => id);
+
+const alphaCode = (index: number) => {
+  let value = index;
+  let result = "";
+  while (value > 0) {
+    value -= 1;
+    result = String.fromCharCode(65 + (value % 26)) + result;
+    value = Math.floor(value / 26);
+  }
+  return result || "A";
+};
+
+const parseStandardEntries = (raw: string): StandardEntry[] => {
+  const jsonCandidate = raw.replace(/【来源：[^】]+】/g, "").trim();
+  try {
+    const parsed = JSON.parse(jsonCandidate);
+    const items = Array.isArray(parsed) ? parsed : Array.isArray(parsed?.standards) ? parsed.standards : [];
+    if (items.length) {
+      return items.map((item: Record<string, unknown>, index: number) => {
+        const text = String(item.text ?? item.条款 ?? item.content ?? item.标准内容 ?? "").trim();
+        const dimension = String(item.dimension ?? item.维度 ?? detectDimensionIds(text)[0] ?? "自定义");
+        return {
+          id: String(item.id ?? item.编号 ?? `${dimension}-${alphaCode(index + 1)}`),
+          dimension,
+          title: String(item.title ?? item.维度名称 ?? dimensionNames[dimension] ?? "上传标准"),
+          severity: severityFromText(String(item.severity ?? item.等级 ?? text)),
+          text,
+        };
+      }).filter((item: StandardEntry) => item.text);
     }
-    const bracket = line.match(/^【([^｜|]+)[｜|]([^】]+)】\s*(.*)$/);
-    if (bracket) {
-      const dimension = `自定义-${String(index + 1).padStart(2, "0")}`;
-      return { id: `${dimension}-A`, dimension, title: bracket[1], severity: severityFromText(bracket[2]), text: bracket[3] };
+  } catch {
+    // 非 JSON 标准继续按 PDF / 表格 / 文本预处理。
+  }
+  const normalized = raw
+    .replace(/第\s*\d+\s*页[：:]/g, "\n")
+    .replace(/【来源：[^】]+】/g, "\n")
+    .replace(/([。；])\s*(?=\d+\.\d+(?:-[A-Z0-9]+)?)/g, "$1\n");
+  const sourceLines = normalized.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const entries: StandardEntry[] = [];
+  const counters: Record<string, number> = {};
+  let activeDimension = "";
+  for (const sourceLine of sourceLines) {
+    if (/^(?:审核维度|维度|序号|条款|等级|说明)$/.test(sourceLine)) continue;
+    const header = sourceLine.match(/^(\d+\.\d+)\s*[-—、:]?\s*([^。；｜|]{2,30})$/);
+    if (header && dimensionNames[header[1]]) {
+      activeDimension = header[1];
+      continue;
     }
-    return { id: `自定义-${String(index + 1).padStart(2, "0")}-A`, dimension: "自定义", title: "上传标准", severity: severityFromText(line), text: line };
-  });
+    const pieces = sourceLine.split(/(?<=[。；])\s*/).map((value) => value.trim()).filter((value) => value.length > 3);
+    for (const line of pieces) {
+      const pipe = line.split(/[｜|]/).map((value) => value.trim()).filter(Boolean);
+      const explicit = pipe[0]?.match(/^(\d+\.\d+)(?:-([A-Z0-9]+))?$/i);
+      if (explicit && pipe.length >= 3) {
+        const dimension = explicit[1];
+        counters[dimension] = (counters[dimension] ?? 0) + 1;
+        const id = `${dimension}-${explicit[2] || alphaCode(counters[dimension])}`;
+        const hasTitle = pipe.length >= 4;
+        entries.push({
+          id,
+          dimension,
+          title: hasTitle ? pipe[1] : dimensionNames[dimension] || "上传标准",
+          severity: severityFromText(hasTitle ? pipe[2] : pipe[1]),
+          text: pipe.slice(hasTitle ? 3 : 2).join("｜"),
+        });
+        activeDimension = dimension;
+        continue;
+      }
+      const bracket = line.match(/^【([^｜|]+)[｜|]([^】]+)】\s*(.*)$/);
+      const detected = detectDimensionIds(line)[0] || activeDimension || "自定义";
+      counters[detected] = (counters[detected] ?? 0) + 1;
+      entries.push({
+        id: `${detected}-${alphaCode(counters[detected])}`,
+        dimension: detected,
+        title: bracket?.[1] || dimensionNames[detected] || "上传标准",
+        severity: severityFromText(bracket?.[2] || line),
+        text: bracket?.[3] || line.replace(/^\d+\.\d+(?:-[A-Z0-9]+)?\s*[-—、:]?\s*/i, ""),
+      });
+    }
+  }
+  return entries.filter((entry, index, list) => entry.text && list.findIndex((item) => item.id === entry.id) === index);
+};
 
 const formatTime = (seconds: number) => {
   const value = Math.max(0, seconds || 0);
@@ -192,20 +295,27 @@ const parseOpinions = (raw: string): Opinion[] => {
   try {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) rows = parsed;
+    else if (Array.isArray(parsed?.opinions)) rows = parsed.opinions;
+    else if (Array.isArray(parsed?.反馈意见)) rows = parsed.反馈意见;
   } catch {
     let currentReviewer = "";
-    rows = raw.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).flatMap((line) => {
+    const normalized = raw
+      .replace(/第\s*\d+\s*页[：:]/g, "\n")
+      .replace(/\s*((?:编导|设计|教研|导演|客户|制片|审核)[^\s，,：:]{0,8}(?:审核|反馈|意见))[：:]?\s*/g, "\n$1\n")
+      .replace(/\s+(?=(?:#\s*)?\d{1,3}[.、）)]\s*)/g, "\n");
+    rows = normalized.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).flatMap((line) => {
         const reviewerHeader = line.match(/^([^\s，,：:]{1,12})(?:审核|反馈|意见)[：:]?$/);
         if (reviewerHeader) {
           currentReviewer = reviewerHeader[1];
           return [];
         }
         const cells = line.split(/\t|,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map((v) => v.replace(/^"|"$/g, "").trim());
-        const cleaned = line.replace(/^(?:[-•·]\s*|\d{1,3}[.、）)]\s*|#\s*\d{1,3}\s*)/, "").trim();
-        if (!cleaned || /^(?:序号|审核意见|反馈内容|意见内容)$/.test(cleaned)) return [];
+        const sequence = line.match(/^(?:#\s*)?(\d{1,3})[.、）)]?\s*/)?.[1] ?? "";
+        const cleaned = line.replace(/^(?:[-•·]\s*|(?:#\s*)?\d{1,3}[.、）)]?\s*)/, "").trim();
+        if (!cleaned || /^(?:序号|审核意见|反馈内容|意见内容|反馈人|审核人)$/.test(cleaned)) return [];
         return [cells.length >= 3
-          ? { timecode: cells[0], reviewer: cells[1], text: cells.slice(2).join("，") }
-          : { reviewer: currentReviewer, text: cleaned }];
+          ? { sequence: cells[0], reviewer: cells[1], text: cells.slice(2).join("，") }
+          : { sequence, reviewer: currentReviewer, text: cleaned }];
       });
   }
   return rows
@@ -214,6 +324,7 @@ const parseOpinions = (raw: string): Opinion[] => {
       const inlineTime = text.match(/\b\d{1,2}:\d{2}(?::\d{2})?(?:\.\d{1,3})?\b/)?.[0] ?? "";
       return {
         id: String(row.id ?? `OP-${String(index + 1).padStart(3, "0")}`),
+        sequence: String(row.sequence ?? row.序号 ?? row.id ?? index + 1),
         timecode: String(row.timecode ?? row.时间码 ?? inlineTime),
         text,
         summary: text.replace(/\b\d{1,2}:\d{2}(?::\d{2})?(?:\.\d{1,3})?\b/g, "").slice(0, 48),
@@ -229,35 +340,24 @@ const parseOpinions = (raw: string): Opinion[] => {
     .filter((item) => item.text);
 };
 
-const dimensionRules = [
-  ["2.1", /黑帧|白帧|夹帧|格式|尺寸|分辨率|码率|爆音|静音|技术/],
-  ["2.2", /角色|人物|服装|衣服|脸型|发色|鞋|造型|体型|比例/],
-  ["2.3", /穿帮|连续|道具|前景|后景|空间|来源|门|位置变化/],
-  ["2.4", /光影|光源|阴影|色温|明暗/],
-  ["2.5", /变形|拉伸|扭曲|画幅|肢体|背景.*动/],
-  ["2.6", /遮挡|出画|卡边|裁切|构图|人物大小|主体大小/],
-  ["2.7", /音画|同步|节奏|台词|口型|跳转|停留|气泡|配音/],
-  ["2.8", /卡顿|闪烁|跳帧|帧率|漂移|不流畅|补帧/],
-  ["2.9", /转场|场景切换|硬切/],
-] as const;
-
 const compareOpinion = (opinion: Opinion, entries: StandardEntry[]): Opinion => {
   const terms = extractTerms(opinion.text);
-  const detectedDimension = dimensionRules.find(([, pattern]) => pattern.test(opinion.text))?.[0] ?? "";
+  const detectedDimensions = detectDimensionIds(opinion.text);
+  const primaryDimension = detectedDimensions[0] ?? "";
   let best: StandardEntry | undefined;
   let bestScore = 0;
   for (const entry of entries) {
     const standardTerms = new Set(extractTerms(`${entry.title}${entry.text}`));
-    const dimensionBonus = detectedDimension && entry.dimension === detectedDimension ? 3 : 0;
+    const dimensionBonus = detectedDimensions.includes(entry.dimension) ? 3 : 0;
     const score = terms.filter((term) => standardTerms.has(term)).length + dimensionBonus;
     if (score > bestScore) {
       bestScore = score;
       best = entry;
     }
   }
-  const creativeCue = /应该|可以考虑|希望|更有感觉|更好看|更突出|主线|剧情|叙事|出场|氛围|尴尬|感染力|先.+再/.test(opinion.text);
+  const creativeCue = /应该|可以考虑|希望|更有感觉|更好看|更突出|主线|剧情|叙事|出场|氛围|尴尬|感染力|呈现方式|先.+再|不应该是.+表情|不要再出现/.test(opinion.text);
   const summary = opinion.text.replace(/\b\d{1,2}:\d{2}(?::\d{2})?(?:\.\d{1,3})?\b/g, "").slice(0, 48);
-  if (!best || bestScore < 2 || (creativeCue && !detectedDimension)) {
+  if (!best || bestScore < 2 || (creativeCue && !primaryDimension)) {
     return {
       ...opinion,
       summary,
@@ -270,28 +370,31 @@ const compareOpinion = (opinion: Opinion, entries: StandardEntry[]): Opinion => 
     };
   }
   const strongRequest = /必须|一律|全部|完全|统一|重做|推翻|不能|严禁/.test(opinion.text);
-  const ambiguousCue = /有点|不太|感觉|似乎|可能|建议|适当|尽量/.test(opinion.text);
+  const ambiguousCue = /有点|不太|感觉|似乎|可能|建议|适当|尽量|奇怪|不和谐|没法看/.test(opinion.text);
+  const dimensionLabel = detectedDimensions.length
+    ? detectedDimensions.map((id) => `${id} ${dimensionNames[id]}`).join(" + ")
+    : `${best.dimension} ${best.title}`;
   if ((strongRequest && best.severity !== "red") || ambiguousCue || bestScore < 4) {
     return {
       ...opinion,
       summary,
       status: "exceeds",
-      dimension: `${best.dimension} ${best.title}`,
+      dimension: dimensionLabel,
       clauseId: best.id,
       severity: best.severity,
       basis: `${best.id}｜${best.title}｜${severityText[best.severity]}｜${best.text}`,
-      reason: strongRequest && best.severity !== "red" ? "意见与标准部分相关，但强制程度高于对应条款。" : "意见与该条款存在关联，但描述较主观或证据不足，建议人工复核。",
+      reason: strongRequest && best.severity !== "red" ? "标准中有相关条目，但该意见的强制程度高于对应条款。" : "涉及的问题在审核标准中有提及，但具体场景或证据未被明确覆盖，建议人工复核。",
     };
   }
   return {
     ...opinion,
     summary,
     status: "within",
-    dimension: `${best.dimension} ${best.title}`,
+    dimension: dimensionLabel,
     clauseId: best.id,
     severity: best.severity,
     basis: `${best.id}｜${best.title}｜${severityText[best.severity]}｜${best.text}`,
-    reason: "审核意见与现有标准存在明确对应关系。",
+    reason: "反馈内容能直接对应到审核标准中的具体条款，有明确标准依据。",
   };
 };
 
@@ -329,7 +432,7 @@ export default function Home() {
     () => standardText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean),
     [standardText],
   );
-  const standardEntries = useMemo(() => parseStandardEntries(standardLines), [standardLines]);
+  const standardEntries = useMemo(() => parseStandardEntries(standardText), [standardText]);
 
   const summary = useMemo(
     () => ({
@@ -350,13 +453,25 @@ export default function Home() {
     [opinions],
   );
   const opinionTotal = Math.max(1, opinions.length);
+  const judgedTotal = opinions.filter((item) => item.status !== "pending").length;
   const dimensionDistribution = useMemo(() => {
     const counts = new Map<string, number>();
-    opinions.filter((item) => item.status !== "pending").forEach((item) => {
+    opinions.filter((item) => item.status === "within" || item.status === "exceeds").forEach((item) => {
       const key = item.dimension || "未分类";
       counts.set(key, (counts.get(key) ?? 0) + 1);
     });
     return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  }, [opinions]);
+  const reviewerSummary = useMemo(() => {
+    const groups = new Map<string, { total: number; within: number; exceeds: number; unsupported: number }>();
+    opinions.forEach((item) => {
+      const key = item.reviewer || "未注明审核人";
+      const current = groups.get(key) ?? { total: 0, within: 0, exceeds: 0, unsupported: 0 };
+      current.total += 1;
+      if (item.status !== "pending") current[item.status] += 1;
+      groups.set(key, current);
+    });
+    return [...groups.entries()];
   }, [opinions]);
 
   const filteredIssues = useMemo(
@@ -425,9 +540,10 @@ export default function Home() {
         for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
           const page = await pdf.getPage(pageNumber);
           const content = await page.getTextContent();
-          const pageText = content.items
-            .map((item) => "str" in item ? item.str : "")
-            .join(" ");
+          const pageText = content.items.map((item) => {
+            if (!("str" in item)) return "";
+            return `${item.str}${"hasEOL" in item && item.hasEOL ? "\n" : " "}`;
+          }).join("");
           pages.push(`第${pageNumber}页：${pageText}`);
           updateDoc(group, id, { progress: 10 + Math.round((pageNumber / pdf.numPages) * 85) });
         }
@@ -449,7 +565,16 @@ export default function Home() {
       if (group === "standard") {
         setStandardText((current) => [current, `【来源：${file.name}】`, text].filter(Boolean).join("\n"));
       } else {
-        setOpinions((current) => [...current, ...parseOpinions(text)]);
+        setOpinions((current) => {
+          const parsed = parseOpinions(text);
+          return [
+            ...current,
+            ...parsed.map((item, index) => ({
+              ...item,
+              id: `OP-${String(current.length + index + 1).padStart(3, "0")}`,
+            })),
+          ];
+        });
       }
     } catch (error) {
       updateDoc(group, id, {
@@ -492,6 +617,7 @@ export default function Home() {
       ...current,
       {
         id: `OP-${String(current.length + 1).padStart(3, "0")}`,
+        sequence: String(current.length + 1),
         timecode: text.match(/\b\d{1,2}:\d{2}(?::\d{2})?(?:\.\d{1,3})?\b/)?.[0] ?? "",
         text,
         summary: text.replace(/\b\d{1,2}:\d{2}(?::\d{2})?(?:\.\d{1,3})?\b/g, "").slice(0, 48),
@@ -693,9 +819,17 @@ export default function Home() {
 
   const buildModelPayload = () => ({
     task: modelQuestion,
-    instructions: "必须逐条处理，不得合并或遗漏意见。为每条意见匹配唯一标准条款，判断为有标准依据(within)、部分相关(exceeds)或超出标准(unsupported)，并评定必须改(red)、建议改(yellow)或可接受(green)。创意方向和个人偏好在无标准依据时归为unsupported。只返回JSON数组，字段为id,summary,dimension,clauseId,status,severity,basis,reason。",
+    instructions: [
+      "你是绘本视频审核标准校验专家。必须逐条处理，不得合并、概括或遗漏任何意见。",
+      "1. 每条反馈单独提取核心问题，去掉情绪化表述。",
+      "2. 在结构化审核标准中搜索最匹配的维度和唯一条款编号。",
+      "3. status只允许：within=有标准依据（直接对应具体条款）；exceeds=部分相关（标准提及该问题但具体场景未明确覆盖）；unsupported=超出标准（个人创意偏好、叙事或导演建议，无直接条款）。",
+      "4. within或exceeds必须标注severity：red=必改、yellow=建议改、green=可接受；unsupported的severity必须为空。",
+      "5. 只返回JSON数组，每个输入id必须恰好返回一次。字段：id,sequence,reviewer,summary,dimension,clauseId,status,severity,basis,reason。",
+    ].join("\n"),
     review_standard: standardEntries,
-    review_opinions: opinions.map(({ id, timecode, text, reviewer }) => ({ id, timecode, text, reviewer })),
+    review_opinions: opinions.map(({ id, sequence, timecode, text, reviewer }) => ({ id, sequence, timecode, text, reviewer })),
+    required_statistics: ["总反馈条数", "有标准依据占比", "部分相关占比", "超出标准占比", "仅计算有标准依据和部分相关的各维度问题分布"],
     video_auto_qc: issues,
     video_metadata: info,
   });
@@ -718,7 +852,7 @@ export default function Home() {
           model: apiModel,
           temperature: 0.1,
           messages: [
-            { role: "system", content: "你是严格但尊重标准边界的视频审核专家。" },
+            { role: "system", content: "你是绘本视频审核标准校验专家。审核标准是唯一校验边界，创意建议不能伪装成标准性必改项。" },
             { role: "user", content: JSON.stringify(buildModelPayload()) },
           ],
         }),
@@ -737,7 +871,9 @@ export default function Home() {
             const nextStatus = ["within", "exceeds", "unsupported"].includes(match.status)
               ? match.status as OpinionStatus
               : item.status;
-            const nextSeverity = ["red", "yellow", "green"].includes(match.severity) ? match.severity as Severity : item.severity;
+            const nextSeverity = nextStatus === "unsupported"
+              ? ""
+              : ["red", "yellow", "green"].includes(match.severity) ? match.severity as Severity : item.severity;
             return { ...item, status: nextStatus, summary: String(match.summary ?? item.summary), dimension: String(match.dimension ?? item.dimension), clauseId: String(match.clauseId ?? item.clauseId), severity: nextSeverity, basis: String(match.basis ?? ""), reason: String(match.reason ?? "") };
           }),
         );
@@ -757,8 +893,13 @@ export default function Home() {
           generated_at: new Date().toISOString(),
           media: info,
           standard: standardLines,
+          structured_standard: standardEntries,
           auto_qc: issues,
-          opinion_summary: opinionSummary,
+          opinion_summary: { total: opinions.length, judged: judgedTotal, ...opinionSummary },
+          reviewer_summary: reviewerSummary,
+          dimension_distribution_supported_and_partial_only: Object.fromEntries(dimensionDistribution),
+          review_validation_results: opinions.filter((item) => item.status === "within" || item.status === "exceeds"),
+          creative_suggestions: opinions.filter((item) => item.status === "unsupported"),
           annotated_opinions: opinions,
           model_reply: modelReply,
         }, null, 2),
@@ -767,18 +908,15 @@ export default function Home() {
       );
       return;
     }
-    const headers = ["意见序号", "时间码", "审核人", "原始审核意见", "内容摘要", "审核维度", "标准条款", "判定", "修改等级", "匹配标准", "判断说明"];
+    const headers = ["序号", "反馈人", "反馈内容摘要", "对应维度", "对应条款", "判定", "建议等级", "说明"];
     const rows = opinions.map((item) => [
-      item.id,
-      item.timecode,
+      item.sequence || item.id,
       item.reviewer,
-      item.text,
       item.summary,
       item.dimension,
-      item.clauseId,
+      item.basis || item.clauseId,
       opinionStatusText[item.status],
       item.severity ? severityText[item.severity] : "",
-      item.basis,
       item.reason,
     ]);
     makeDownload(
@@ -829,12 +967,16 @@ export default function Home() {
       <section className="intake">
         <article className="intakeCard">
           <div className="intakeNumber">01</div>
-          <div className="intakeTitle"><strong>审核标准资料</strong><span>{standardDocs.length} 个文件 · {standardLines.length} 条规则</span></div>
+          <div className="intakeTitle"><strong>审核标准资料</strong><span>{standardDocs.length} 个文件 · {standardEntries.length} 条编号条款</span></div>
           <label className="multiUpload" htmlFor="standard-file-input">
             <span>＋</span><strong>批量上传标准文件</strong><small>PDF、图片、TXT、MD、CSV、JSON</small>
           </label>
           <input id="standard-file-input" ref={standardInputRef} className="nativeFileInput" aria-label="选择审核标准文件" type="file" multiple accept=".pdf,image/*,.txt,.md,.csv,.tsv,.json" onChange={(event) => onDocuments(event, "standard")} />
           {renderDocs(standardDocs)}
+          <details className="standardIndex">
+            <summary>查看结构化条款（{standardEntries.length}）</summary>
+            <div>{standardEntries.map((entry) => <span key={entry.id}><b>{entry.id}</b><em>{entry.title}</em><i className={`badge ${entry.severity}`}>{severityText[entry.severity]}</i><small>{entry.text}</small></span>)}</div>
+          </details>
           <details className="textEditor">
             <summary>查看 / 编辑已提取标准文本</summary>
             <textarea value={standardText} onChange={(event) => setStandardText(event.target.value)} aria-label="审核标准内容" />
@@ -875,15 +1017,15 @@ export default function Home() {
         <aside className="controlPanel">
           <div className="sectionLabel">04 · 综合审核</div>
           <div className="readiness">
-            <span className={standardLines.length ? "ready" : ""}>审核标准 <b>{standardLines.length ? "已就绪" : "缺失"}</b></span>
+            <span className={standardEntries.length ? "ready" : ""}>审核标准 <b>{standardEntries.length ? `${standardEntries.length} 条已编号` : "缺失"}</b></span>
             <span className={opinions.length ? "ready" : ""}>审核意见 <b>{opinions.length ? `${opinions.length} 条` : "缺失"}</b></span>
             <span className={videoFile ? "ready" : ""}>视频素材 <b>{videoFile ? "已就绪" : "缺失"}</b></span>
           </div>
           <label className="rangeRow"><span>采样间隔 <b>{sampleSeconds.toFixed(1)}s</b></span><input type="range" min="0.25" max="2" step="0.25" value={sampleSeconds} onChange={(e) => setSampleSeconds(Number(e.target.value))} /></label>
           <label className="rangeRow"><span>黑帧阈值 <b>{blackThreshold}</b></span><input type="range" min="4" max="30" step="1" value={blackThreshold} onChange={(e) => setBlackThreshold(Number(e.target.value))} /></label>
           <label className="rangeRow"><span>静帧灵敏度 <b>{freezeThreshold.toFixed(1)}</b></span><input type="range" min="0.8" max="6" step="0.2" value={freezeThreshold} onChange={(e) => setFreezeThreshold(Number(e.target.value))} /></label>
-          <button className="secondaryAction" disabled={!opinions.length || !standardLines.length} onClick={runOpinionComparison}>仅比对标准与意见</button>
-          <button className="analyzeButton" disabled={!videoFile || !standardLines.length || running} onClick={analyzeVideo}>{running ? "正在综合审核…" : "开始视频综合审核"}</button>
+          <button className="secondaryAction" disabled={!opinions.length || !standardEntries.length} onClick={runOpinionComparison}>逐条校验全部意见</button>
+          <button className="analyzeButton" disabled={!videoFile || !standardEntries.length || running} onClick={analyzeVideo}>{running ? "正在综合审核…" : "开始视频综合审核"}</button>
           <div className="progressTrack"><span style={{ width: `${progress}%` }} /></div>
           <p className="statusText">{status}</p>
         </aside>
@@ -902,24 +1044,29 @@ export default function Home() {
           <div className="reportActions"><button onClick={() => exportReport("csv")} disabled={!opinions.length}>下载标注 CSV</button><button onClick={() => exportReport("json")} disabled={!opinions.length && !issues.length}>下载完整 JSON</button></div>
         </div>
         <div className="opinionSummaryGrid">
-          {(["within", "exceeds", "unsupported", "pending"] as OpinionStatus[]).map((key) => <div className={`opinionSummary ${key}`} key={key}><span>{opinionStatusText[key]}</span><strong>{opinionSummary[key]}</strong><small>{opinions.length ? `${Math.round((opinionSummary[key] / opinionTotal) * 100)}%` : "0%"}</small></div>)}
+          <div className="opinionSummary total"><span>总反馈条数</span><strong>{opinions.length}</strong><small>{opinionSummary.pending ? `${opinionSummary.pending} 条待判断` : `${judgedTotal} 条已判断`}</small></div>
+          {(["within", "exceeds", "unsupported"] as OpinionStatus[]).map((key) => <div className={`opinionSummary ${key}`} key={key}><span>{opinionStatusText[key]}</span><strong>{opinionSummary[key]}</strong><small>{opinions.length ? `${Math.round((opinionSummary[key] / opinionTotal) * 100)}%` : "0%"}</small></div>)}
         </div>
-        {!!dimensionDistribution.length && <div className="dimensionPanel"><div><strong>维度分布</strong><small>共 {opinions.length} 条意见，按逐条判断结果统计</small></div><div className="dimensionBars">{dimensionDistribution.map(([dimension, count]) => <span key={dimension}><b>{dimension}</b><i><em style={{ width: `${Math.round((count / opinionTotal) * 100)}%` }} /></i><small>{count}</small></span>)}</div></div>}
+        {!!reviewerSummary.length && <div className="reviewerPanel"><div><strong>反馈人分组小结</strong><small>逐人核对总数与三级判定，便于发现遗漏。</small></div><div className="reviewerGrid">{reviewerSummary.map(([reviewer, count]) => <span key={reviewer}><b>{reviewer}</b><small>共 {count.total} 条</small><em>✅ {count.within}　⚠️ {count.exceeds}　❓ {count.unsupported}</em></span>)}</div></div>}
+        {!!dimensionDistribution.length && <div className="dimensionPanel"><div><strong>问题维度分布</strong><small>严格按建议：仅统计“有标准依据”和“部分相关”的反馈，不计创意建议。</small></div><div className="dimensionBars">{dimensionDistribution.map(([dimension, count]) => <span key={dimension}><b>{dimension}</b><i><em style={{ width: `${Math.round((count / Math.max(1, opinionSummary.within + opinionSummary.exceeds)) * 100)}%` }} /></i><small>{count}</small></span>)}</div></div>}
         <div className="opinionTable">
-          <div className="opinionHead"><span>序号 / 审核人</span><span>意见内容 / 摘要</span><span>维度 / 标准条款</span><span>判定 / 等级</span><span>判断说明</span></div>
+          <div className="opinionHead"><span>序号</span><span>反馈人</span><span>反馈内容摘要</span><span>对应维度</span><span>对应条款</span><span>判定</span><span>建议等级</span><span>说明</span></div>
           {!opinions.length ? <div className="emptyIssues"><span>◎</span><strong>上传或输入审核意见后开始比对</strong><small>系统会自动标记超出标准与缺少依据的意见</small></div> : opinions.map((opinion) => (
             <div className={`opinionRow ${opinion.status}`} key={opinion.id}>
-              <div className="opinionMeta"><b>{opinion.id}</b><span>{opinion.reviewer || "未注明审核人"}</span><small>{opinion.timecode || "无时间码"}</small></div>
-              <div className="opinionText">{opinion.text}<small>摘要：{opinion.summary || "待生成"}</small></div>
-              <div className="opinionBasis"><b>{opinion.dimension || "待分类"} · {opinion.clauseId || "待匹配"}</b><small>{opinion.basis || "尚未匹配标准"}</small></div>
-              <div className="opinionDecision"><select value={opinion.status} onChange={(event) => setOpinions((current) => current.map((item) => item.id === opinion.id ? { ...item, status: event.target.value as OpinionStatus } : item))} aria-label={`${opinion.id}审核结论`}>
+              <div className="opinionSequence"><b>{opinion.sequence || opinion.id}</b><small>{opinion.id}</small></div>
+              <div className="opinionReviewer">{opinion.reviewer || "未注明"}<small>{opinion.timecode || "无时间码"}</small></div>
+              <div className="opinionText">{opinion.summary || "待生成"}<small title={opinion.text}>原文：{opinion.text}</small></div>
+              <div className="opinionDimension">{opinion.dimension || "待分类"}</div>
+              <div className="opinionBasis"><b>{opinion.clauseId || "待匹配"}</b><small>{opinion.basis || "尚未匹配标准"}</small></div>
+              <div className="opinionDecision"><select value={opinion.status} onChange={(event) => setOpinions((current) => current.map((item) => item.id === opinion.id ? { ...item, status: event.target.value as OpinionStatus, severity: event.target.value === "unsupported" || event.target.value === "pending" ? "" : item.severity } : item))} aria-label={`${opinion.id}审核结论`}>
                 {(["within", "exceeds", "unsupported", "pending"] as OpinionStatus[]).map((key) => <option key={key} value={key}>{opinionStatusText[key]}</option>)}
-              </select>{opinion.severity && <span className={`badge ${opinion.severity}`}>{severityText[opinion.severity]}</span>}</div>
-              <div className="opinionReason">{opinion.reason || "点击“仅比对标准与意见”开始判断。"}</div>
+              </select></div>
+              <div className="opinionLevel">{opinion.severity ? <span className={`badge ${opinion.severity}`}>{severityText[opinion.severity]}</span> : "—"}</div>
+              <div className="opinionReason">{opinion.reason || "点击“逐条校验全部意见”开始判断。"}</div>
             </div>
           ))}
         </div>
-        {!!opinionSummary.unsupported && <div className="creativePanel"><div><strong>创意 / 主观建议单独清单</strong><small>以下意见不作为标准性必改项，建议进入创意讨论或补充标准后再判定。</small></div>{opinions.filter((item) => item.status === "unsupported").map((item) => <span key={item.id}><b>{item.id}</b>{item.text}</span>)}</div>}
+        {!!opinionSummary.unsupported && <div className="creativePanel"><div><strong>创意建议汇总</strong><small>超出审核标准的反馈仅供编导参考决定是否采纳，不进入标准性修改清单。</small></div>{opinions.filter((item) => item.status === "unsupported").map((item) => <span key={item.id}><b>#{item.sequence}</b><em>{item.reviewer || "未注明反馈人"}</em>{item.text}</span>)}</div>}
       </section>
 
       <section className="modelSection">

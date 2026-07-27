@@ -136,7 +136,7 @@ main { min-height: 100vh; }
 .intakeTitle strong { font-size: 15px; }
 .intakeTitle span { color: var(--muted); font-size: 10px; }
 .intakeCard > textarea, .opinionComposer, .miniDropzone, .intakeCard > .softButton,
-.multiUpload, .docList, .textEditor, .videoProgress {
+.multiUpload, .docList, .standardIndex, .textEditor, .videoProgress {
   grid-column: 1 / -1;
 }
 .intakeCard > textarea, .opinionComposer textarea {
@@ -212,7 +212,14 @@ main { min-height: 100vh; }
 }
 .docItem.error .fileProgress > span { background: var(--red); }
 .textEditor { border-top: 1px solid #263642; padding-top: 8px; }
-.textEditor summary { color: #9db0bd; font-size: 10px; cursor: pointer; }
+.textEditor summary, .standardIndex summary { color: #9db0bd; font-size: 10px; cursor: pointer; }
+.standardIndex { border-top: 1px solid #263642; padding-top: 8px; }
+.standardIndex > div { display: grid; gap: 6px; max-height: 220px; overflow-y: auto; margin-top: 8px; }
+.standardIndex span { display: grid; grid-template-columns: 54px 1fr auto; gap: 6px; align-items: center; border: 1px solid #293945; border-radius: 8px; padding: 7px; }
+.standardIndex b { color: var(--cyan); font: 700 9px monospace; }
+.standardIndex em { color: #bcc8cf; font-style: normal; font-size: 9px; }
+.standardIndex i { font-style: normal; }
+.standardIndex small { grid-column: 1 / -1; color: var(--muted); font-size: 8px; line-height: 1.5; }
 .textEditor textarea {
   width: 100%; min-height: 160px; margin-top: 8px;
   border: 1px solid #314150; border-radius: 10px;
@@ -362,15 +369,17 @@ main { min-height: 100vh; }
 .opinionSummary span { color: var(--muted); font-size: 11px; }
 .opinionSummary strong { font-size: 25px; }
 .opinionSummary small { color: #6f8290; font: 10px monospace; }
+.opinionSummary.total strong { color: var(--cyan); }
 .opinionSummary.within strong { color: var(--green); }
-.opinionSummary.exceeds strong { color: var(--red); }
+.opinionSummary.exceeds strong { color: var(--yellow); }
 .opinionSummary.unsupported strong { color: var(--yellow); }
 .opinionSummary.pending strong { color: var(--violet); }
-.opinionTable { overflow: hidden; }
+.opinionTable { overflow-x: auto; }
 .opinionHead, .opinionRow {
   display: grid;
-  grid-template-columns: 110px minmax(210px,1.2fr) minmax(190px,.9fr) 120px minmax(180px,1fr);
-  gap: 15px; align-items: start;
+  grid-template-columns: 62px 92px minmax(220px,1.25fr) 150px minmax(190px,1fr) 145px 82px minmax(210px,1.15fr);
+  min-width: 1260px;
+  gap: 12px; align-items: start;
 }
 .opinionHead {
   padding: 12px 18px; border-bottom: 1px solid var(--line);
@@ -385,8 +394,12 @@ main { min-height: 100vh; }
 .opinionMeta b { color: var(--cyan); font: 700 11px monospace; }
 .opinionMeta span { font: 11px monospace; color: #d4e1e7; }
 .opinionMeta small, .opinionBasis small { color: var(--muted); font-size: 10px; line-height: 1.5; }
+.opinionSequence, .opinionReviewer { display: grid; gap: 5px; font-size: 11px; color: #d4e1e7; }
+.opinionSequence b { color: var(--cyan); font: 700 12px monospace; }
+.opinionSequence small, .opinionReviewer small { color: var(--muted); font: 9px monospace; }
 .opinionText { font-size: 12px; line-height: 1.7; color: #d9e2e6; }
 .opinionText small { display: block; color: var(--muted); margin-top: 6px; }
+.opinionDimension { color: #b8c8d1; font-size: 11px; line-height: 1.55; }
 .opinionBasis { display: grid; gap: 6px; }
 .opinionBasis b { font-size: 11px; line-height: 1.5; font-weight: 500; color: #bfcbd2; }
 .opinionRow select {
@@ -394,13 +407,18 @@ main { min-height: 100vh; }
   background: #0b131a; color: #d5e0e5; padding: 8px; font-size: 11px;
 }
 .opinionDecision { display: grid; gap: 8px; }
+.opinionLevel { color: var(--muted); font-size: 11px; }
 .opinionReason { color: #95a8b4; font-size: 11px; line-height: 1.6; }
-.dimensionPanel, .creativePanel {
+.dimensionPanel, .reviewerPanel, .creativePanel {
   border: 1px solid var(--line); border-radius: 13px; background: rgba(17,25,35,.82);
   padding: 16px 18px; margin-bottom: 12px;
 }
-.dimensionPanel > div:first-child, .creativePanel > div:first-child { display: grid; gap: 5px; margin-bottom: 12px; }
-.dimensionPanel small, .creativePanel small { color: var(--muted); font-size: 10px; }
+.dimensionPanel > div:first-child, .reviewerPanel > div:first-child, .creativePanel > div:first-child { display: grid; gap: 5px; margin-bottom: 12px; }
+.dimensionPanel small, .reviewerPanel small, .creativePanel small { color: var(--muted); font-size: 10px; }
+.reviewerGrid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
+.reviewerGrid > span { border: 1px solid #2b3a47; border-radius: 9px; background: #0d151d; padding: 10px; display: grid; grid-template-columns: 1fr auto; gap: 5px 8px; }
+.reviewerGrid b { font-size: 11px; }
+.reviewerGrid em { grid-column: 1 / -1; color: #9db0bd; font: normal 10px monospace; }
 .dimensionBars { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px 18px; }
 .dimensionBars > span { display: grid; grid-template-columns: minmax(110px,1fr) 1fr 24px; align-items: center; gap: 8px; font-size: 10px; color: #aebcc4; }
 .dimensionBars i { height: 4px; background: #253340; border-radius: 3px; overflow: hidden; }
@@ -409,6 +427,7 @@ main { min-height: 100vh; }
 .creativePanel { border-color: rgba(255,200,87,.28); display: grid; gap: 8px; }
 .creativePanel > span { font-size: 11px; line-height: 1.5; color: #c6d0d5; }
 .creativePanel > span b { color: var(--yellow); font-family: monospace; margin-right: 9px; }
+.creativePanel > span em { color: #8295a2; font-style: normal; margin-right: 9px; }
 
 .modelSection {
   padding-top: 18px; padding-bottom: 55px;
@@ -498,9 +517,7 @@ footer {
   .heroStat strong { font-size: 50px; }
   .workspace { grid-template-columns: 1fr; }
   .controlPanel { position: static; }
-  .opinionHead { display: none; }
-  .opinionRow { grid-template-columns: 100px 1fr; }
-  .opinionBasis, .opinionReason { grid-column: 1 / -1; }
+  .reviewerGrid { grid-template-columns: 1fr 1fr; }
   .dimensionBars { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 680px) {
@@ -515,9 +532,7 @@ footer {
   .mediaMeta span:nth-child(2) { border-right: 0; }
   .mediaMeta span:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
   .opinionSummaryGrid { grid-template-columns: 1fr 1fr; }
-  .opinionRow { grid-template-columns: 1fr; }
-  .opinionBasis { grid-column: auto; }
-  .opinionReason { grid-column: auto; }
+  .reviewerGrid { grid-template-columns: 1fr; }
   .dimensionBars { grid-template-columns: 1fr; }
   .summaryGrid { grid-template-columns: 1fr; }
   .issueRow { grid-template-columns: 8px 72px minmax(0,1fr) 56px; }
