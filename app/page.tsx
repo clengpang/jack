@@ -20,10 +20,22 @@ type Opinion = {
   id: string;
   timecode: string;
   text: string;
+  summary: string;
   reviewer: string;
   status: OpinionStatus;
+  dimension: string;
+  clauseId: string;
+  severity: Severity | "";
   basis: string;
   reason: string;
+};
+
+type StandardEntry = {
+  id: string;
+  dimension: string;
+  title: string;
+  severity: Severity;
+  text: string;
 };
 
 type UploadedDoc = {
@@ -54,21 +66,46 @@ const severityText: Record<Severity, string> = {
 };
 
 const opinionStatusText: Record<OpinionStatus, string> = {
-  within: "标准内",
-  exceeds: "超出标准",
-  unsupported: "缺少依据",
+  within: "有标准依据",
+  exceeds: "部分相关",
+  unsupported: "超出标准",
   pending: "待判断",
 };
 
-const defaultStandard = `【基础技术｜必须改】黑帧、白帧、夹帧、卡顿、画面比例错误必须修改。
-【角色一致性｜必须改】主角发色、服装、体型发生明显变化必须修改；配角轻微差异可接受。
-【穿帮连续性｜必须改】主角明显穿帮必须修改；配角微小穿帮建议修改。
-【光影｜建议改】同一场景光源反转必须修改；正常场景差异可接受。
-【画面变形｜必须改】主角脸部或肢体明显拉伸必须修改；背景轻微变形可接受。
-【安全构图｜必须改】主角脸部、头部被裁切必须修改；设计性半身特写可接受。
-【视频节奏｜建议改】音画错位、变身卡顿必须修改；单页时长轻微偏差建议调整。
-【补帧流畅度｜必须改】明显闪烁、跳帧、低帧率必须修改；静态画面可接受。
-【转场｜建议改】场景变化无转场造成迷惑必须修改；转场时长轻微差异可接受。`;
+const defaultStandard = `2.1-A｜基础技术错误｜必须改｜黑帧、白帧、夹帧、卡顿、画面比例错误、音频爆音或异常静音必须修改。
+2.2-A｜角色造型一致性｜必须改｜主角发色、服装、脸型、体型发生明显变化必须修改。
+2.2-B｜角色造型一致性｜可接受｜配角不影响识别的轻微造型差异可接受。
+2.3-A｜穿帮与连续性｜必须改｜主角、关键道具、前后景关系出现明显穿帮或连续性错误必须修改。
+2.3-B｜穿帮与连续性｜建议改｜配角或非关键道具的微小穿帮建议修改。
+2.4-A｜光影一致性｜必须改｜同一场景的光源方向反转、阴影或色温明显跳变必须修改。
+2.4-B｜光影一致性｜可接受｜不影响观看的正常场景光影差异可接受。
+2.5-A｜画面变形｜必须改｜主角脸部、肢体明显拉伸、扭曲或画幅变形必须修改。
+2.5-B｜画面变形｜可接受｜背景轻微变形且不影响主体可接受。
+2.6-A｜安全构图｜必须改｜主角脸部、头部被裁切，主体严重遮挡、出画或卡边必须修改。
+2.6-B｜安全构图｜可接受｜符合叙事目的的半身特写与设计性裁切可接受。
+2.7-A｜音画与视频节奏｜必须改｜音画错位、台词与口型不同步、关键动作卡顿必须修改。
+2.7-B｜音画与视频节奏｜建议改｜单页停留与节奏轻微偏差建议调整。
+2.8-A｜补帧流畅度｜必须改｜明显闪烁、跳帧、低帧率、主体漂移必须修改。
+2.8-B｜补帧流畅度｜可接受｜设计性静态画面可接受。
+2.9-A｜转场规范｜必须改｜场景变化无转场并造成理解障碍必须修改。
+2.9-B｜转场规范｜建议改｜转场时长或形式轻微不统一建议调整。`;
+
+const severityFromText = (value: string): Severity =>
+  /必须|必改|严重|红/.test(value) ? "red" : /建议|黄/.test(value) ? "yellow" : "green";
+
+const parseStandardEntries = (lines: string[]): StandardEntry[] =>
+  lines.map((line, index) => {
+    const pipe = line.split(/[｜|]/).map((value) => value.trim()).filter(Boolean);
+    if (pipe.length >= 4 && /^\d+(?:\.\d+)?-[A-Z0-9]+$/i.test(pipe[0])) {
+      return { id: pipe[0], dimension: pipe[0].split("-")[0], title: pipe[1], severity: severityFromText(pipe[2]), text: pipe.slice(3).join("｜") };
+    }
+    const bracket = line.match(/^【([^｜|]+)[｜|]([^】]+)】\s*(.*)$/);
+    if (bracket) {
+      const dimension = `自定义-${String(index + 1).padStart(2, "0")}`;
+      return { id: `${dimension}-A`, dimension, title: bracket[1], severity: severityFromText(bracket[2]), text: bracket[3] };
+    }
+    return { id: `自定义-${String(index + 1).padStart(2, "0")}-A`, dimension: "自定义", title: "上传标准", severity: severityFromText(line), text: line };
+  });
 
 const formatTime = (seconds: number) => {
   const value = Math.max(0, seconds || 0);
@@ -156,15 +193,19 @@ const parseOpinions = (raw: string): Opinion[] => {
     const parsed = JSON.parse(raw);
     if (Array.isArray(parsed)) rows = parsed;
   } catch {
-    rows = raw
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((line) => {
+    let currentReviewer = "";
+    rows = raw.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).flatMap((line) => {
+        const reviewerHeader = line.match(/^([^\s，,：:]{1,12})(?:审核|反馈|意见)[：:]?$/);
+        if (reviewerHeader) {
+          currentReviewer = reviewerHeader[1];
+          return [];
+        }
         const cells = line.split(/\t|,(?=(?:[^"]*"[^"]*")*[^"]*$)/).map((v) => v.replace(/^"|"$/g, "").trim());
-        return cells.length >= 3
+        const cleaned = line.replace(/^(?:[-•·]\s*|\d{1,3}[.、）)]\s*|#\s*\d{1,3}\s*)/, "").trim();
+        if (!cleaned || /^(?:序号|审核意见|反馈内容|意见内容)$/.test(cleaned)) return [];
+        return [cells.length >= 3
           ? { timecode: cells[0], reviewer: cells[1], text: cells.slice(2).join("，") }
-          : { text: line };
+          : { reviewer: currentReviewer, text: cleaned }];
       });
   }
   return rows
@@ -175,8 +216,12 @@ const parseOpinions = (raw: string): Opinion[] => {
         id: String(row.id ?? `OP-${String(index + 1).padStart(3, "0")}`),
         timecode: String(row.timecode ?? row.时间码 ?? inlineTime),
         text,
+        summary: text.replace(/\b\d{1,2}:\d{2}(?::\d{2})?(?:\.\d{1,3})?\b/g, "").slice(0, 48),
         reviewer: String(row.reviewer ?? row.审核人 ?? row.反馈人员 ?? ""),
         status: "pending" as OpinionStatus,
+        dimension: "",
+        clauseId: "",
+        severity: "",
         basis: "",
         reason: "",
       };
@@ -184,40 +229,68 @@ const parseOpinions = (raw: string): Opinion[] => {
     .filter((item) => item.text);
 };
 
-const compareOpinion = (opinion: Opinion, standardLines: string[]): Opinion => {
+const dimensionRules = [
+  ["2.1", /黑帧|白帧|夹帧|格式|尺寸|分辨率|码率|爆音|静音|技术/],
+  ["2.2", /角色|人物|服装|衣服|脸型|发色|鞋|造型|体型|比例/],
+  ["2.3", /穿帮|连续|道具|前景|后景|空间|来源|门|位置变化/],
+  ["2.4", /光影|光源|阴影|色温|明暗/],
+  ["2.5", /变形|拉伸|扭曲|画幅|肢体|背景.*动/],
+  ["2.6", /遮挡|出画|卡边|裁切|构图|人物大小|主体大小/],
+  ["2.7", /音画|同步|节奏|台词|口型|跳转|停留|气泡|配音/],
+  ["2.8", /卡顿|闪烁|跳帧|帧率|漂移|不流畅|补帧/],
+  ["2.9", /转场|场景切换|硬切/],
+] as const;
+
+const compareOpinion = (opinion: Opinion, entries: StandardEntry[]): Opinion => {
   const terms = extractTerms(opinion.text);
-  let best = "";
+  const detectedDimension = dimensionRules.find(([, pattern]) => pattern.test(opinion.text))?.[0] ?? "";
+  let best: StandardEntry | undefined;
   let bestScore = 0;
-  for (const line of standardLines) {
-    const standardTerms = new Set(extractTerms(line));
-    const score = terms.filter((term) => standardTerms.has(term)).length;
+  for (const entry of entries) {
+    const standardTerms = new Set(extractTerms(`${entry.title}${entry.text}`));
+    const dimensionBonus = detectedDimension && entry.dimension === detectedDimension ? 3 : 0;
+    const score = terms.filter((term) => standardTerms.has(term)).length + dimensionBonus;
     if (score > bestScore) {
       bestScore = score;
-      best = line;
+      best = entry;
     }
   }
-  if (!best || bestScore < 1) {
+  const creativeCue = /应该|可以考虑|希望|更有感觉|更好看|更突出|主线|剧情|叙事|出场|氛围|尴尬|感染力|先.+再/.test(opinion.text);
+  const summary = opinion.text.replace(/\b\d{1,2}:\d{2}(?::\d{2})?(?:\.\d{1,3})?\b/g, "").slice(0, 48);
+  if (!best || bestScore < 2 || (creativeCue && !detectedDimension)) {
     return {
       ...opinion,
+      summary,
       status: "unsupported",
+      dimension: "创意/主观建议",
+      clauseId: "—",
+      severity: "",
       basis: "",
-      reason: "未在当前审核标准中找到足够接近的条款，建议补充依据后再要求修改。",
+      reason: "属于创意方向或个人偏好，当前标准无直接条款依据，建议作为创意建议单独讨论。",
     };
   }
   const strongRequest = /必须|一律|全部|完全|统一|重做|推翻|不能|严禁/.test(opinion.text);
-  const weakStandard = /建议|可接受|轻微|不影响/.test(best) && !/必须改/.test(best);
-  if (strongRequest && weakStandard) {
+  const ambiguousCue = /有点|不太|感觉|似乎|可能|建议|适当|尽量/.test(opinion.text);
+  if ((strongRequest && best.severity !== "red") || ambiguousCue || bestScore < 4) {
     return {
       ...opinion,
+      summary,
       status: "exceeds",
-      basis: best,
-      reason: "审核意见使用了强制性要求，但匹配标准仅为建议或可接受范围。",
+      dimension: `${best.dimension} ${best.title}`,
+      clauseId: best.id,
+      severity: best.severity,
+      basis: `${best.id}｜${best.title}｜${severityText[best.severity]}｜${best.text}`,
+      reason: strongRequest && best.severity !== "red" ? "意见与标准部分相关，但强制程度高于对应条款。" : "意见与该条款存在关联，但描述较主观或证据不足，建议人工复核。",
     };
   }
   return {
     ...opinion,
+    summary,
     status: "within",
-    basis: best,
+    dimension: `${best.dimension} ${best.title}`,
+    clauseId: best.id,
+    severity: best.severity,
+    basis: `${best.id}｜${best.title}｜${severityText[best.severity]}｜${best.text}`,
     reason: "审核意见与现有标准存在明确对应关系。",
   };
 };
@@ -256,6 +329,7 @@ export default function Home() {
     () => standardText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean),
     [standardText],
   );
+  const standardEntries = useMemo(() => parseStandardEntries(standardLines), [standardLines]);
 
   const summary = useMemo(
     () => ({
@@ -275,6 +349,15 @@ export default function Home() {
     }),
     [opinions],
   );
+  const opinionTotal = Math.max(1, opinions.length);
+  const dimensionDistribution = useMemo(() => {
+    const counts = new Map<string, number>();
+    opinions.filter((item) => item.status !== "pending").forEach((item) => {
+      const key = item.dimension || "未分类";
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    });
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  }, [opinions]);
 
   const filteredIssues = useMemo(
     () => activeFilter === "all" ? issues : issues.filter((item) => item.severity === activeFilter),
@@ -411,8 +494,12 @@ export default function Home() {
         id: `OP-${String(current.length + 1).padStart(3, "0")}`,
         timecode: text.match(/\b\d{1,2}:\d{2}(?::\d{2})?(?:\.\d{1,3})?\b/)?.[0] ?? "",
         text,
+        summary: text.replace(/\b\d{1,2}:\d{2}(?::\d{2})?(?:\.\d{1,3})?\b/g, "").slice(0, 48),
         reviewer: "手动输入",
         status: "pending",
+        dimension: "",
+        clauseId: "",
+        severity: "",
         basis: "",
         reason: "",
       },
@@ -421,7 +508,7 @@ export default function Home() {
   };
 
   const runOpinionComparison = () => {
-    setOpinions((current) => current.map((item) => compareOpinion(item, standardLines)));
+    setOpinions((current) => current.map((item) => compareOpinion(item, standardEntries)));
   };
 
   const seek = (video: HTMLVideoElement, time: number) =>
@@ -586,7 +673,7 @@ export default function Home() {
 
       found.sort((a, b) => a.start - b.start || a.severity.localeCompare(b.severity));
       setIssues(found);
-      setOpinions((current) => current.map((item) => compareOpinion(item, standardLines)));
+      setOpinions((current) => current.map((item) => compareOpinion(item, standardEntries)));
       setProgress(100);
       setStatus(`综合审核完成：${found.length} 项视频问题，${opinions.length} 条审核意见`);
       video.currentTime = 0;
@@ -606,8 +693,8 @@ export default function Home() {
 
   const buildModelPayload = () => ({
     task: modelQuestion,
-    instructions: "逐条判断审核意见是否在标准内、是否超出标准、或缺少依据。只返回JSON数组，字段为id,status,basis,reason；status仅允许within/exceeds/unsupported。",
-    review_standard: standardLines,
+    instructions: "必须逐条处理，不得合并或遗漏意见。为每条意见匹配唯一标准条款，判断为有标准依据(within)、部分相关(exceeds)或超出标准(unsupported)，并评定必须改(red)、建议改(yellow)或可接受(green)。创意方向和个人偏好在无标准依据时归为unsupported。只返回JSON数组，字段为id,summary,dimension,clauseId,status,severity,basis,reason。",
+    review_standard: standardEntries,
     review_opinions: opinions.map(({ id, timecode, text, reviewer }) => ({ id, timecode, text, reviewer })),
     video_auto_qc: issues,
     video_metadata: info,
@@ -650,7 +737,8 @@ export default function Home() {
             const nextStatus = ["within", "exceeds", "unsupported"].includes(match.status)
               ? match.status as OpinionStatus
               : item.status;
-            return { ...item, status: nextStatus, basis: String(match.basis ?? ""), reason: String(match.reason ?? "") };
+            const nextSeverity = ["red", "yellow", "green"].includes(match.severity) ? match.severity as Severity : item.severity;
+            return { ...item, status: nextStatus, summary: String(match.summary ?? item.summary), dimension: String(match.dimension ?? item.dimension), clauseId: String(match.clauseId ?? item.clauseId), severity: nextSeverity, basis: String(match.basis ?? ""), reason: String(match.reason ?? "") };
           }),
         );
       }
@@ -679,13 +767,17 @@ export default function Home() {
       );
       return;
     }
-    const headers = ["意见ID", "时间码", "审核人", "审核意见", "标注结论", "匹配标准", "判断原因"];
+    const headers = ["意见序号", "时间码", "审核人", "原始审核意见", "内容摘要", "审核维度", "标准条款", "判定", "修改等级", "匹配标准", "判断说明"];
     const rows = opinions.map((item) => [
       item.id,
       item.timecode,
       item.reviewer,
       item.text,
+      item.summary,
+      item.dimension,
+      item.clauseId,
       opinionStatusText[item.status],
+      item.severity ? severityText[item.severity] : "",
       item.basis,
       item.reason,
     ]);
@@ -723,7 +815,7 @@ export default function Home() {
 
       <section className="hero compactHero">
         <div>
-          <span className="eyebrow">AI REVIEW OPERATING SYSTEM</span>
+          <span className="eyebrow">AI REVIEW OPERATING SYSTEM · V3</span>
           <h1>让标准约束意见，<br /><em>让视频验证判断。</em></h1>
           <p>同时对比审核标准、历史审核意见与视频自动质检结果，标出超出标准或缺少依据的意见，并形成可下载的结构化报告。</p>
         </div>
@@ -810,21 +902,24 @@ export default function Home() {
           <div className="reportActions"><button onClick={() => exportReport("csv")} disabled={!opinions.length}>下载标注 CSV</button><button onClick={() => exportReport("json")} disabled={!opinions.length && !issues.length}>下载完整 JSON</button></div>
         </div>
         <div className="opinionSummaryGrid">
-          {(["within", "exceeds", "unsupported", "pending"] as OpinionStatus[]).map((key) => <div className={`opinionSummary ${key}`} key={key}><span>{opinionStatusText[key]}</span><strong>{opinionSummary[key]}</strong></div>)}
+          {(["within", "exceeds", "unsupported", "pending"] as OpinionStatus[]).map((key) => <div className={`opinionSummary ${key}`} key={key}><span>{opinionStatusText[key]}</span><strong>{opinionSummary[key]}</strong><small>{opinions.length ? `${Math.round((opinionSummary[key] / opinionTotal) * 100)}%` : "0%"}</small></div>)}
         </div>
+        {!!dimensionDistribution.length && <div className="dimensionPanel"><div><strong>维度分布</strong><small>共 {opinions.length} 条意见，按逐条判断结果统计</small></div><div className="dimensionBars">{dimensionDistribution.map(([dimension, count]) => <span key={dimension}><b>{dimension}</b><i><em style={{ width: `${Math.round((count / opinionTotal) * 100)}%` }} /></i><small>{count}</small></span>)}</div></div>}
         <div className="opinionTable">
-          <div className="opinionHead"><span>ID / 时间码</span><span>原始审核意见</span><span>匹配标准与判断</span><span>结论</span></div>
+          <div className="opinionHead"><span>序号 / 审核人</span><span>意见内容 / 摘要</span><span>维度 / 标准条款</span><span>判定 / 等级</span><span>判断说明</span></div>
           {!opinions.length ? <div className="emptyIssues"><span>◎</span><strong>上传或输入审核意见后开始比对</strong><small>系统会自动标记超出标准与缺少依据的意见</small></div> : opinions.map((opinion) => (
             <div className={`opinionRow ${opinion.status}`} key={opinion.id}>
-              <div className="opinionMeta"><b>{opinion.id}</b><span>{opinion.timecode || "无时间码"}</span><small>{opinion.reviewer || "未注明审核人"}</small></div>
-              <div className="opinionText">{opinion.text}</div>
-              <div className="opinionBasis"><b>{opinion.basis || "尚未匹配标准"}</b><small>{opinion.reason || "点击“仅比对标准与意见”开始判断。"}</small></div>
-              <select value={opinion.status} onChange={(event) => setOpinions((current) => current.map((item) => item.id === opinion.id ? { ...item, status: event.target.value as OpinionStatus } : item))} aria-label={`${opinion.id}审核结论`}>
+              <div className="opinionMeta"><b>{opinion.id}</b><span>{opinion.reviewer || "未注明审核人"}</span><small>{opinion.timecode || "无时间码"}</small></div>
+              <div className="opinionText">{opinion.text}<small>摘要：{opinion.summary || "待生成"}</small></div>
+              <div className="opinionBasis"><b>{opinion.dimension || "待分类"} · {opinion.clauseId || "待匹配"}</b><small>{opinion.basis || "尚未匹配标准"}</small></div>
+              <div className="opinionDecision"><select value={opinion.status} onChange={(event) => setOpinions((current) => current.map((item) => item.id === opinion.id ? { ...item, status: event.target.value as OpinionStatus } : item))} aria-label={`${opinion.id}审核结论`}>
                 {(["within", "exceeds", "unsupported", "pending"] as OpinionStatus[]).map((key) => <option key={key} value={key}>{opinionStatusText[key]}</option>)}
-              </select>
+              </select>{opinion.severity && <span className={`badge ${opinion.severity}`}>{severityText[opinion.severity]}</span>}</div>
+              <div className="opinionReason">{opinion.reason || "点击“仅比对标准与意见”开始判断。"}</div>
             </div>
           ))}
         </div>
+        {!!opinionSummary.unsupported && <div className="creativePanel"><div><strong>创意 / 主观建议单独清单</strong><small>以下意见不作为标准性必改项，建议进入创意讨论或补充标准后再判定。</small></div>{opinions.filter((item) => item.status === "unsupported").map((item) => <span key={item.id}><b>{item.id}</b>{item.text}</span>)}</div>}
       </section>
 
       <section className="modelSection">
