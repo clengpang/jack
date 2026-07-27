@@ -247,6 +247,33 @@ main { min-height: 100vh; }
   white-space: nowrap;
   border: 0;
 }
+.nativeFileInput {
+  width: 100%;
+  min-height: 38px;
+  padding: 7px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(255,255,255,.025);
+  color: var(--muted);
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+}
+.nativeFileInput::file-selector-button {
+  margin-right: 10px;
+  padding: 7px 12px;
+  border: 1px solid var(--lime);
+  border-radius: 6px;
+  background: rgba(206,255,0,.12);
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.nativeFileInput:focus-visible {
+  outline: 2px solid var(--lime);
+  outline-offset: 2px;
+}
 
 .workspace {
   padding-bottom: 34px;

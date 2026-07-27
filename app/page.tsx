@@ -741,7 +741,7 @@ export default function Home() {
           <label className="multiUpload" htmlFor="standard-file-input">
             <span>＋</span><strong>批量上传标准文件</strong><small>PDF、图片、TXT、MD、CSV、JSON</small>
           </label>
-          <input id="standard-file-input" ref={standardInputRef} className="hiddenInput" type="file" multiple accept=".pdf,image/*,.txt,.md,.csv,.tsv,.json" onChange={(event) => onDocuments(event, "standard")} />
+          <input id="standard-file-input" ref={standardInputRef} className="nativeFileInput" aria-label="选择审核标准文件" type="file" multiple accept=".pdf,image/*,.txt,.md,.csv,.tsv,.json" onChange={(event) => onDocuments(event, "standard")} />
           {renderDocs(standardDocs)}
           <details className="textEditor">
             <summary>查看 / 编辑已提取标准文本</summary>
@@ -755,7 +755,7 @@ export default function Home() {
           <label className="multiUpload" htmlFor="opinion-file-input">
             <span>＋</span><strong>批量上传意见文件</strong><small>PDF、图片、TXT、CSV、JSON</small>
           </label>
-          <input id="opinion-file-input" ref={opinionInputRef} className="hiddenInput" type="file" multiple accept=".pdf,image/*,.txt,.md,.csv,.tsv,.json" onChange={(event) => onDocuments(event, "opinion")} />
+          <input id="opinion-file-input" ref={opinionInputRef} className="nativeFileInput" aria-label="选择审核意见文件" type="file" multiple accept=".pdf,image/*,.txt,.md,.csv,.tsv,.json" onChange={(event) => onDocuments(event, "opinion")} />
           {renderDocs(opinionDocs)}
           <div className="opinionComposer">
             <textarea value={opinionDraft} onChange={(event) => setOpinionDraft(event.target.value)} placeholder="输入意见，例如：00:18 主角服装必须全部重做…" aria-label="新增审核意见" />
@@ -771,7 +771,7 @@ export default function Home() {
             <strong>{videoFile?.name || "选择视频文件"}</strong>
             <small>MP4、MOV、WebM · 不上传服务器</small>
           </label>
-          <input id="video-file-input" ref={videoInputRef} className="hiddenInput" type="file" accept="video/*" onChange={onVideoFile} />
+          <input id="video-file-input" ref={videoInputRef} className="nativeFileInput" aria-label="选择视频素材" type="file" accept="video/*" onChange={onVideoFile} />
           <div className="videoProgress">
             <div><span>{videoFile ? "视频读取完成" : "等待选择视频"}</span><b>{videoUploadProgress}%</b></div>
             <div className="fileProgress"><span style={{ width: `${videoUploadProgress}%` }} /></div>
