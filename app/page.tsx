@@ -42,7 +42,7 @@ type StandardEntry = {
 type UploadedDoc = {
   id: string;
   name: string;
-  kind: "pdf" | "image" | "text";
+  kind: "pdf" | "word" | "image" | "text";
   size: number;
   progress: number;
   status: "reading" | "recognizing" | "done" | "error";
@@ -225,12 +225,17 @@ const formatSize = (bytes: number) =>
 
 const docKind = (file: File): UploadedDoc["kind"] => {
   if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) return "pdf";
+  if (
+    file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+    file.name.toLowerCase().endsWith(".docx")
+  ) return "word";
   if (file.type.startsWith("image/")) return "image";
   return "text";
 };
 
 const docKindText: Record<UploadedDoc["kind"], string> = {
   pdf: "PDF",
+  word: "Word DOCX",
   image: "图片 OCR",
   text: "文本",
 };
@@ -538,6 +543,22 @@ export default function Home() {
           reader.onerror = () => reject(reader.error);
           reader.readAsText(file);
         });
+      } else if (kind === "word") {
+        updateDoc(group, id, { status: "recognizing", progress: 8 });
+        const reader = new FileReader();
+        const arrayBuffer = await new Promise<ArrayBuffer>((resolve, reject) => {
+          reader.onprogress = (event) => {
+            if (event.lengthComputable) updateDoc(group, id, { progress: 8 + Math.round((event.loaded / event.total) * 42) });
+          };
+          reader.onload = () => resolve(reader.result as ArrayBuffer);
+          reader.onerror = () => reject(reader.error);
+          reader.readAsArrayBuffer(file);
+        });
+        updateDoc(group, id, { progress: 58 });
+        const mammoth = await import("mammoth");
+        const result = await mammoth.extractRawText({ arrayBuffer });
+        text = result.value;
+        updateDoc(group, id, { progress: 95 });
       } else if (kind === "pdf") {
         updateDoc(group, id, { status: "recognizing", progress: 10 });
         const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
@@ -940,7 +961,7 @@ export default function Home() {
     <div className="docList">
       {docs.map((doc) => (
         <div className={`docItem ${doc.status}`} key={doc.id}>
-          {doc.preview ? <img src={doc.preview} alt="" /> : <span className="docType">{doc.kind === "pdf" ? "PDF" : "TXT"}</span>}
+          {doc.preview ? <img src={doc.preview} alt="" /> : <span className="docType">{doc.kind === "pdf" ? "PDF" : doc.kind === "word" ? "DOCX" : "TXT"}</span>}
           <div className="docInfo">
             <div><strong>{doc.name}</strong><small>{docKindText[doc.kind]} · {formatSize(doc.size)}</small></div>
             <div className="fileProgress"><span style={{ width: `${doc.progress}%` }} /></div>
@@ -979,9 +1000,9 @@ export default function Home() {
           <div className="intakeNumber">01</div>
           <div className="intakeTitle"><strong>审核标准资料</strong><span>{standardDocs.length} 个文件 · {standardEntries.length} 条编号条款</span></div>
           <label className="multiUpload" htmlFor="standard-file-input">
-            <span>＋</span><strong>批量上传标准文件</strong><small>PDF、图片、TXT、MD、CSV、JSON</small>
+            <span>＋</span><strong>批量上传标准文件</strong><small>Word（DOCX）、PDF、图片、TXT、MD、CSV、JSON</small>
           </label>
-          <input id="standard-file-input" ref={standardInputRef} className="nativeFileInput" aria-label="选择审核标准文件" type="file" multiple accept=".pdf,image/*,.txt,.md,.csv,.tsv,.json" onChange={(event) => onDocuments(event, "standard")} />
+          <input id="standard-file-input" ref={standardInputRef} className="nativeFileInput" aria-label="选择审核标准文件" type="file" multiple accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.pdf,image/*,.txt,.md,.csv,.tsv,.json" onChange={(event) => onDocuments(event, "standard")} />
           {renderDocs(standardDocs)}
           <details className="standardIndex">
             <summary>查看结构化条款（{standardEntries.length}）</summary>
@@ -997,9 +1018,9 @@ export default function Home() {
           <div className="intakeNumber">02</div>
           <div className="intakeTitle"><strong>审核意见资料</strong><span>{opinionDocs.length} 个文件 · {opinions.length} 条意见</span></div>
           <label className="multiUpload" htmlFor="opinion-file-input">
-            <span>＋</span><strong>批量上传意见文件</strong><small>PDF、图片、TXT、CSV、JSON</small>
+            <span>＋</span><strong>批量上传意见文件</strong><small>Word（DOCX）、PDF、图片、TXT、CSV、JSON</small>
           </label>
-          <input id="opinion-file-input" ref={opinionInputRef} className="nativeFileInput" aria-label="选择审核意见文件" type="file" multiple accept=".pdf,image/*,.txt,.md,.csv,.tsv,.json" onChange={(event) => onDocuments(event, "opinion")} />
+          <input id="opinion-file-input" ref={opinionInputRef} className="nativeFileInput" aria-label="选择审核意见文件" type="file" multiple accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.pdf,image/*,.txt,.md,.csv,.tsv,.json" onChange={(event) => onDocuments(event, "opinion")} />
           {renderDocs(opinionDocs)}
           <div className="opinionComposer">
             <textarea value={opinionDraft} onChange={(event) => setOpinionDraft(event.target.value)} placeholder="输入意见，例如：00:18 主角服装必须全部重做…" aria-label="新增审核意见" />
