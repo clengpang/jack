@@ -425,6 +425,7 @@ export default function Home() {
   const [standardText, setStandardText] = useState(defaultStandard);
   const [standardDocs, setStandardDocs] = useState<UploadedDoc[]>([]);
   const [opinionDocs, setOpinionDocs] = useState<UploadedDoc[]>([]);
+  const [uploadNotices, setUploadNotices] = useState({ standard: "", opinion: "" });
   const [opinionDraft, setOpinionDraft] = useState("");
   const [opinions, setOpinions] = useState<Opinion[]>([]);
   const [info, setInfo] = useState<MediaInfo | null>(null);
@@ -529,7 +530,7 @@ export default function Home() {
     file: File,
     group: "standard" | "opinion",
     id: string,
-  ) => {
+  ): Promise<boolean> => {
     const kind = docKind(file);
     try {
       let text = "";
@@ -592,6 +593,9 @@ export default function Home() {
         text = result.data.text;
       }
 
+      if (!text.trim()) {
+        throw new Error("未识别到可用文字；如为扫描版 PDF，请先转为图片或可检索文字的 PDF 后重试。");
+      }
       updateDoc(group, id, { text, status: "done", progress: 100 });
       if (group === "standard") {
         setStandardText((current) => [current, `【来源：${file.name}】`, text].filter(Boolean).join("\n"));
@@ -607,12 +611,14 @@ export default function Home() {
           ];
         });
       }
+      return true;
     } catch (error) {
       updateDoc(group, id, {
         status: "error",
         progress: 100,
         error: error instanceof Error ? error.message : "文件解析失败",
       });
+      return false;
     }
   };
 
@@ -620,8 +626,10 @@ export default function Home() {
     event: ChangeEvent<HTMLInputElement>,
     group: "standard" | "opinion",
   ) => {
-    const files = Array.from(event.target.files ?? []);
+    const input = event.currentTarget;
+    const files = Array.from(input.files ?? []);
     if (!files.length) return;
+    input.value = "";
     const docs: UploadedDoc[] = files.map((file, index) => ({
       id: `${group}-${Date.now()}-${index}`,
       name: file.name,
@@ -635,10 +643,17 @@ export default function Home() {
     const setter = group === "standard" ? setStandardDocs : setOpinionDocs;
     if (group === "standard" && standardDocs.length === 0) setStandardText("");
     setter((current) => [...current, ...docs]);
+    setUploadNotices((current) => ({ ...current, [group]: `正在处理 ${files.length} 个文件…` }));
+    let succeeded = 0;
     for (let index = 0; index < files.length; index++) {
-      await processDocument(files[index], group, docs[index].id);
+      if (await processDocument(files[index], group, docs[index].id)) succeeded += 1;
     }
-    event.target.value = "";
+    setUploadNotices((current) => ({
+      ...current,
+      [group]: succeeded === files.length
+        ? `${files.length} 个文件已处理完成，识别内容已显示在下方。`
+        : `${succeeded}/${files.length} 个文件识别成功；请查看文件卡片中的错误说明。`,
+    }));
   };
 
   const addOpinion = () => {
@@ -1003,7 +1018,17 @@ export default function Home() {
             <span>＋</span><strong>批量上传标准文件</strong><small>Word（DOCX）、PDF、图片、TXT、MD、CSV、JSON</small>
           </label>
           <input id="standard-file-input" ref={standardInputRef} className="nativeFileInput" aria-label="选择审核标准文件" type="file" multiple accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.pdf,image/*,.txt,.md,.csv,.tsv,.json" onChange={(event) => onDocuments(event, "standard")} />
+          {uploadNotices.standard && <div className="uploadNotice" role="status"><span>✓</span>{uploadNotices.standard}</div>}
           {renderDocs(standardDocs)}
+          {!!standardDocs.length && (
+            <div className="uploadPreview">
+              <div><strong>已识别审核标准</strong><span>{standardEntries.length} 条</span></div>
+              {standardEntries.slice(0, 5).map((entry) => (
+                <p key={entry.id}><b>{entry.id}</b><span>{entry.title}</span><small>{entry.text}</small></p>
+              ))}
+              {standardEntries.length > 5 && <em>另有 {standardEntries.length - 5} 条，可在“查看结构化条款”中展开查看。</em>}
+            </div>
+          )}
           <details className="standardIndex">
             <summary>查看结构化条款（{standardEntries.length}）</summary>
             <div>{standardEntries.map((entry) => <span key={entry.id}><b>{entry.id}</b><em>{entry.title}</em><i className={`badge ${entry.severity}`}>{severityText[entry.severity]}</i><small>{entry.text}</small></span>)}</div>
@@ -1021,7 +1046,17 @@ export default function Home() {
             <span>＋</span><strong>批量上传意见文件</strong><small>Word（DOCX）、PDF、图片、TXT、CSV、JSON</small>
           </label>
           <input id="opinion-file-input" ref={opinionInputRef} className="nativeFileInput" aria-label="选择审核意见文件" type="file" multiple accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.pdf,image/*,.txt,.md,.csv,.tsv,.json" onChange={(event) => onDocuments(event, "opinion")} />
+          {uploadNotices.opinion && <div className="uploadNotice" role="status"><span>✓</span>{uploadNotices.opinion}</div>}
           {renderDocs(opinionDocs)}
+          {!!opinionDocs.length && (
+            <div className="uploadPreview opinionUploadPreview">
+              <div><strong>已识别审核意见</strong><span>{opinions.length} 条</span></div>
+              {opinions.slice(0, 5).map((opinion) => (
+                <p key={opinion.id}><b>#{opinion.sequence}</b><span>{opinion.reviewer || "未注明反馈人"}</span><small>{opinion.text}</small></p>
+              ))}
+              {opinions.length > 5 && <em>另有 {opinions.length - 5} 条，已同步显示在下方“标准边界核验”表中。</em>}
+            </div>
+          )}
           <div className="opinionComposer">
             <textarea value={opinionDraft} onChange={(event) => setOpinionDraft(event.target.value)} placeholder="输入意见，例如：00:18 主角服装必须全部重做…" aria-label="新增审核意见" />
             <button onClick={addOpinion}>添加</button>

@@ -185,6 +185,34 @@ main { min-height: 100vh; }
 .multiUpload strong { font-size: 12px; align-self: end; }
 .multiUpload small { color: var(--muted); font-size: 9px; align-self: start; margin-top: 3px; }
 .docList { display: grid; gap: 7px; max-height: 230px; overflow-y: auto; }
+.uploadNotice {
+  display: flex; align-items: center; gap: 8px;
+  border: 1px solid rgba(104,220,140,.25); border-radius: 9px;
+  background: rgba(104,220,140,.055); color: #b9d3c1;
+  padding: 9px 11px; font-size: 10px; line-height: 1.5;
+}
+.uploadNotice span { color: var(--green); font-weight: 900; }
+.uploadPreview {
+  display: grid; gap: 7px; max-height: 250px; overflow-y: auto;
+  border: 1px solid #30404c; border-radius: 11px;
+  background: #0b131a; padding: 11px;
+}
+.uploadPreview > div {
+  display: flex; align-items: center; justify-content: space-between;
+  padding-bottom: 8px; border-bottom: 1px solid #263642;
+}
+.uploadPreview > div strong { font-size: 11px; }
+.uploadPreview > div span { color: var(--green); font: 700 10px monospace; }
+.uploadPreview p {
+  display: grid; grid-template-columns: 54px minmax(90px,.45fr) 1.3fr;
+  gap: 8px; align-items: start; margin: 0; padding: 7px 8px;
+  border-radius: 8px; background: rgba(255,255,255,.022);
+}
+.uploadPreview p b { color: var(--cyan); font: 700 9px monospace; }
+.uploadPreview p span { color: #c6d2d8; font-size: 9px; }
+.uploadPreview p small { color: #8295a2; font-size: 9px; line-height: 1.5; }
+.uploadPreview > em { color: var(--muted); font-size: 9px; font-style: normal; }
+.opinionUploadPreview p { grid-template-columns: 44px 86px 1fr; }
 .docItem {
   display: grid; grid-template-columns: 42px 1fr; gap: 9px;
   align-items: center; border: 1px solid #2b3a47; border-radius: 10px;
