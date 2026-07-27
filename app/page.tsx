@@ -1097,7 +1097,46 @@ export default function Home() {
             </div>
           ))}
         </div>
-        {!!opinionSummary.unsupported && <div className="creativePanel"><div><strong>创意建议汇总</strong><small>超出审核标准的反馈仅供编导参考决定是否采纳，不进入标准性修改清单。</small></div>{opinions.filter((item) => item.status === "unsupported").map((item) => <span key={item.id}><b>#{item.sequence}</b><em>{item.reviewer || "未注明反馈人"}</em>{item.text}</span>)}</div>}
+        {!!opinionSummary.unsupported && (
+          <section className="creativePanel">
+            <div className="creativeHeader">
+              <div>
+                <strong>创意建议汇总</strong>
+                <small>超出审核标准的反馈仅供编导参考决定是否采纳，不进入标准性修改清单。</small>
+              </div>
+              <span>{opinionSummary.unsupported} 条创意建议</span>
+            </div>
+            <div className="creativeTableWrap">
+              <table className="creativeTable">
+                <thead>
+                  <tr>
+                    <th scope="col">序号</th>
+                    <th scope="col">反馈人</th>
+                    <th scope="col">时间码</th>
+                    <th scope="col">创意建议</th>
+                    <th scope="col">超出标准说明</th>
+                    <th scope="col">建议处理</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {opinions.filter((item) => item.status === "unsupported").map((item) => (
+                    <tr key={item.id}>
+                      <td className="creativeSequence">#{item.sequence}</td>
+                      <td>{item.reviewer || "未注明"}</td>
+                      <td className="creativeTimecode">{item.timecode || "—"}</td>
+                      <td className="creativeSuggestion">
+                        <strong>{item.summary || item.text}</strong>
+                        {item.summary && item.summary !== item.text && <small>原始意见：{item.text}</small>}
+                      </td>
+                      <td className="creativeReason">{item.reason || "现有审核标准中未找到可直接对应的条款。"}</td>
+                      <td><span className="creativeAction">提交编导评估</span><small className="creativeActionNote">决定采纳、搁置或补充为新标准</small></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        )}
       </section>
 
       <section className="modelSection">
