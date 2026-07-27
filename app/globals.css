@@ -136,7 +136,7 @@ main { min-height: 100vh; }
 .intakeTitle strong { font-size: 15px; }
 .intakeTitle span { color: var(--muted); font-size: 10px; }
 .intakeCard > textarea, .opinionComposer, .miniDropzone, .intakeCard > .softButton,
-.multiUpload, .docList, .standardIndex, .textEditor, .videoProgress {
+.multiUpload, .uploadNotice, .docList, .uploadPreview, .standardIndex, .textEditor, .videoProgress {
   grid-column: 1 / -1;
 }
 .intakeCard > textarea, .opinionComposer textarea {
